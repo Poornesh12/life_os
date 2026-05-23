@@ -56,6 +56,12 @@ jobs:
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
+            # Ensure the kubectl config is present and has the right permissions
+            sudo mkdir -p ~/.kube
+            sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
+            sudo chown -R $(id -u):$(id -g) ~/.kube
+            export KUBECONFIG=~/.kube/config
+            
             # Pull the latest codebase (assuming it was cloned to ~/life-os)
             if [ ! -d "~/life-os" ]; then
               git clone https://github.com/${{ github.repository }}.git ~/life-os
