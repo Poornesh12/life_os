@@ -17,8 +17,8 @@ spec:
     spec:
       containers:
       - name: client
-        image: lifeos-client:latest # Assuming this image is available locally
-        imagePullPolicy: IfNotPresent
+        image: ghcr.io/poornesh12/life_os-client:latest
+        imagePullPolicy: Always
         ports:
         - containerPort: 5173
         env:

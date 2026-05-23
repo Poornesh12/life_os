@@ -17,8 +17,8 @@ spec:
     spec:
       containers:
       - name: server
-        image: lifeos-server:latest # Assuming this image is available locally or pushed to a registry
-        imagePullPolicy: IfNotPresent # Use local image if available
+        image: ghcr.io/poornesh12/life_os-server:latest
+        imagePullPolicy: Always
         ports:
         - containerPort: 8000
         envFrom:
