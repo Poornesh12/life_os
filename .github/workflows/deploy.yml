@@ -24,12 +24,12 @@ jobs:
           - name: server
             context: ./server
             target: ''
-            image: ${{ env.SERVER_IMAGE }}
+            image: ghcr.io/poornesh12/life_os-server:latest
 
           - name: client
             context: ./client
             target: development
-            image: ${{ env.CLIENT_IMAGE }}
+            image: ghcr.io/poornesh12/life_os-client:latest
 
     steps:
       - name: Checkout repository
