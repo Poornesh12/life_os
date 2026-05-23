@@ -7,87 +7,106 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  # GHCR requires lowercase repository names
-  SERVER_IMAGE_NAME: poornesh12/life_os-server
-  CLIENT_IMAGE_NAME: poornesh12/life_os-client
+  SERVER_IMAGE: ghcr.io/poornesh12/life_os-server:latest
+  CLIENT_IMAGE: ghcr.io/poornesh12/life_os-client:latest
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+
     permissions:
       contents: read
       packages: write
+
+    strategy:
+      matrix:
+        include:
+          - name: server
+            context: ./server
+            target: ''
+            image: ${{ env.SERVER_IMAGE }}
+
+          - name: client
+            context: ./client
+            target: development
+            image: ${{ env.CLIENT_IMAGE }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Log in to the Container registry
+      - name: Login to GHCR
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Build and push server
-      - name: Build and push server image
+      - name: Build and push ${{ matrix.name }} image
         uses: docker/build-push-action@v5
         with:
-          context: ./server
+          context: ${{ matrix.context }}
+          target: ${{ matrix.target || '' }}
           push: true
-          tags: ${{ env.REGISTRY }}/${{ env.SERVER_IMAGE_NAME }}:latest
-          
-      # Build and push client
-      - name: Build and push client image
-        uses: docker/build-push-action@v5
-        with:
-          context: ./client
-          target: development
-          push: true
-          tags: ${{ env.REGISTRY }}/${{ env.CLIENT_IMAGE_NAME }}:latest
+          tags: ${{ matrix.image }}
 
   deploy:
     needs: build-and-push
     runs-on: ubuntu-latest
+
     steps:
-      - name: Deploy to EC2 via SSH
+      - name: Deploy to EC2
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
+
           script: |
-            # Ensure the kubectl config is present and has the right permissions
-            sudo mkdir -p ~/.kube
+            set -e
+
+            export KUBECONFIG=$HOME/.kube/config
+            REPO_DIR=$HOME/life-os
+
+            echo "Setting up kubeconfig..."
+            mkdir -p ~/.kube
             sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
-            sudo chown -R $(id -u):$(id -g) ~/.kube
-            export KUBECONFIG=~/.kube/config
-            
-            # Pull the latest codebase (assuming it was cloned to ~/life-os)
-            if [ ! -d "~/life-os" ]; then
-              git clone https://github.com/${{ github.repository }}.git ~/life-os
+            sudo chown $(id -u):$(id -g) ~/.kube/config
+
+            echo "Cloning or updating repository..."
+            if [ ! -d "$REPO_DIR/.git" ]; then
+              git clone https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git $REPO_DIR
             fi
-            
-            cd ~/life-os
-            git pull origin main
-            
-            # Create lifeos namespace if it doesn't exist
-            kubectl get namespace lifeos || kubectl create namespace lifeos
-            
-            # Create a docker registry secret so K3s can pull from GHCR
+
+            cd $REPO_DIR
+            git pull https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git main
+
+            echo "Creating namespace..."
+            kubectl create namespace lifeos --dry-run=client -o yaml | kubectl apply -f -
+
+            echo "Creating GHCR image pull secret..."
             kubectl create secret docker-registry ghcr-secret \
-              --docker-server=https://ghcr.io \
+              --docker-server=ghcr.io \
               --docker-username=${{ github.actor }} \
               --docker-password=${{ secrets.GITHUB_TOKEN }} \
               --docker-email=github-actions@github.com \
               -n lifeos \
               --dry-run=client -o yaml | kubectl apply -f -
-            
-            # Patch the default service account in lifeos namespace to use the secret
-            kubectl patch serviceaccount default -n lifeos -p '{"imagePullSecrets": [{"name": "ghcr-secret"}]}'
-            
-            # Apply all K8s manifests
+
+            echo "Patching default service account..."
+            kubectl patch serviceaccount default \
+              -n lifeos \
+              -p '{"imagePullSecrets":[{"name":"ghcr-secret"}]}' || true
+
+            echo "Applying Kubernetes manifests..."
             kubectl apply -k infra/k8s/
-            
-            # Force a restart of the deployments to pick up the new images
-            kubectl rollout restart deployment server-deployment -n lifeos
-            kubectl rollout restart deployment client-deployment -n lifeos
+
+            echo "Restarting deployments..."
+            kubectl rollout restart deployment/server-deployment -n lifeos
+            kubectl rollout restart deployment/client-deployment -n lifeos
+
+            echo "Waiting for rollout..."
+            kubectl rollout status deployment/server-deployment -n lifeos
+            kubectl rollout status deployment/client-deployment -n lifeos
+
+            echo "Deployment completed successfully."
