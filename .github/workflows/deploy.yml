@@ -68,10 +68,7 @@ jobs:
             export KUBECONFIG=$HOME/.kube/config
             REPO_DIR=$HOME/life-os
 
-            echo "Setting up kubeconfig..."
-            mkdir -p ~/.kube
-            sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
-            sudo chown $(id -u):$(id -g) ~/.kube/config
+            # Assumes ~/.kube/config is already set up on the host.
 
             echo "Cloning or updating repository..."
             if [ ! -d "$REPO_DIR/.git" ]; then
