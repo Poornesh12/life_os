@@ -1,17 +1,6 @@
 version: '3.9'
 
 services:
-  mongodb:
-    image: mongo:7
-    container_name: lifeos-mongo
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongo_data:/data/db
-    environment:
-      MONGO_INITDB_DATABASE: lifeos
-    restart: unless-stopped
-
   server:
     build:
       context: ./server
@@ -20,28 +9,28 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - MONGODB_URI=mongodb://mongodb:27017
+      - MONGODB_URI=mongodb://host.docker.internal:27017
       - DB_NAME=lifeos
     env_file:
       - ./server/.env
-    depends_on:
-      - mongodb
     restart: unless-stopped
     volumes:
       - ./server:/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
   client:
-    image: node:20-alpine
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+      target: development
     container_name: lifeos-client
-    working_dir: /app
-    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
     ports:
       - "5173:5173"
+    environment:
+      - VITE_PROXY_TARGET=http://server:8000
     volumes:
       - ./client:/app
+      - /app/node_modules
     depends_on:
       - server
     restart: unless-stopped
-
-volumes:
-  mongo_data:

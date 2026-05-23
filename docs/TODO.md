@@ -11,4 +11,5 @@
 - [ ] Create dashboard
 
 ## Infra
-- [ ] Docker setup
+- [x] Docker setup
+- [x] Kubernetes setup

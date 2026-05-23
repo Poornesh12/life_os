@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: server-deployment
+  namespace: lifeos
+  labels:
+    app: server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: server
+  template:
+    metadata:
+      labels:
+        app: server
+    spec:
+      containers:
+      - name: server
+        image: lifeos-server:latest # Assuming this image is available locally or pushed to a registry
+        imagePullPolicy: IfNotPresent # Use local image if available
+        ports:
+        - containerPort: 8000
+        envFrom:
+        - configMapRef:
+            name: lifeos-config
+        # Overriding the start command to ensure it binds to 0.0.0.0
+        command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
