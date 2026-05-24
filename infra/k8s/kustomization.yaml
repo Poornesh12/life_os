@@ -6,6 +6,3 @@ resources:
   - configmap.yaml
   - server-deployment.yaml
   - server-service.yaml
-  - client-deployment.yaml
-  - client-service.yaml
-  - ingress.yaml

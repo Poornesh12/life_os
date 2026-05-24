@@ -1,4 +1,4 @@
-name: Build and Deploy to EC2 Kubernetes
+name: Build and Deploy (CloudFront + S3 + EC2)
 
 on:
   push:
@@ -8,28 +8,13 @@ on:
 env:
   REGISTRY: ghcr.io
   SERVER_IMAGE: ghcr.io/poornesh12/life_os-server:latest
-  CLIENT_IMAGE: ghcr.io/poornesh12/life_os-client:latest
 
 jobs:
-  build-and-push:
+  build-server:
     runs-on: ubuntu-latest
-
     permissions:
       contents: read
       packages: write
-
-    strategy:
-      matrix:
-        include:
-          - name: server
-            context: ./server
-            target: ''
-            image: ghcr.io/poornesh12/life_os-server:latest
-
-          - name: client
-            context: ./client
-            target: development
-            image: ghcr.io/poornesh12/life_os-client:latest
 
     steps:
       - name: Checkout repository
@@ -45,16 +30,50 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push ${{ matrix.name }} image
+      - name: Build and push server image
         uses: docker/build-push-action@v5
         with:
-          context: ${{ matrix.context }}
-          target: ${{ matrix.target || '' }}
+          context: ./server
           push: true
-          tags: ${{ matrix.image }}
+          tags: ${{ env.SERVER_IMAGE }}
+
+  build-and-upload-client:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          cd client
+          npm ci
+
+      - name: Build application
+        run: |
+          cd client
+          npm run build
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Upload to S3
+        run: |
+          aws s3 sync client/dist s3://${{ secrets.AWS_S3_BUCKET }} --delete
 
   deploy:
-    needs: build-and-push
+    needs: [build-server, build-and-upload-client]
     runs-on: ubuntu-latest
 
     steps:
@@ -103,10 +122,8 @@ jobs:
 
             echo "Restarting deployments..."
             kubectl rollout restart deployment/server-deployment -n lifeos
-            kubectl rollout restart deployment/client-deployment -n lifeos
 
             echo "Waiting for rollout..."
             kubectl rollout status deployment/server-deployment -n lifeos
-            kubectl rollout status deployment/client-deployment -n lifeos
 
             echo "Deployment completed successfully."
