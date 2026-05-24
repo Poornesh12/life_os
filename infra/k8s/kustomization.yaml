@@ -4,8 +4,6 @@ namespace: lifeos
 resources:
   - namespace.yaml
   - configmap.yaml
-  - mongodb-deployment.yaml
-  - mongodb-service.yaml
   - server-deployment.yaml
   - server-service.yaml
   - client-deployment.yaml
