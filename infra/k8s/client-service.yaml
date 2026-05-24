@@ -10,5 +10,4 @@ spec:
     - protocol: TCP
       port: 5173
       targetPort: 5173
-      nodePort: 30173 # Optional fixed port for NodePort access
-  type: NodePort # Assuming local cluster access without full LoadBalancer capabilities by default
+  type: ClusterIP
