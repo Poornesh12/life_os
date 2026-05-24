@@ -8,7 +8,7 @@ metadata:
     cert-manager.io/cluster-issuer: "letsencrypt-prod"
 spec:
   rules:
-    - host: lifeos.my_dev_app.com # Replace with your actual domain
+    - host: lifeos.my-dev-app.com # Replace with your actual domain
       http:
         paths:
           - path: /
@@ -27,5 +27,5 @@ spec:
                   number: 8000
   tls:
     - hosts:
-        - lifeos.my_dev_app.com # Replace with your actual domain
+        - lifeos.my-dev-app.com # Replace with your actual domain
       secretName: lifeos-tls-cert
