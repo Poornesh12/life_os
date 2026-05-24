@@ -29,6 +29,9 @@ async def create_transaction(
     service: TransactionService = Depends(get_service),
 ):
     result = await service.create(user_id, payload)
+    print("=========================================================================")
+    print("result =>", result)
+    print("=========================================================================")
     return SuccessResponse(data=result)
 
 
